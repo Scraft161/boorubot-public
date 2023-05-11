@@ -1,0 +1,17 @@
+[package]
+name = "boorubot"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+booru-rs = "0.2.5"
+deep-danbooru = "0.0.0"
+dotenv = "0.15.0"
+lazy_static = "1.4.0"
+serenity = { version = "0.11.5", default_features = false, features = ["client", "gateway", "rustls_backend", "model"] }
+tokio = { version = "1.28.1", features = ["macros", "rt-multi-thread"] }
+
+[profile.release]
+opt-level = 3
