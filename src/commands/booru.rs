@@ -42,7 +42,7 @@ pub async fn run(options: &[CommandDataOption], allow_nsfw: bool, allow_ecchi: b
                             }
                         }
 
-                        if illegal_tags.len() > 0 {
+                        if !illegal_tags.is_empty() {
                             return InteractionReturn::SilentMessage(format!("Your search includes tags that would violate discord's ToS: `{}`", illegal_tags.join("` `")));
                         }
 
@@ -206,6 +206,7 @@ Options:
     accepts any number, max of 5 due to discord's link embed limit.
 
 Note for moderators:
-This command may produce sexual explicit material, while we try to do our best to filter this out; gelbooru's tag system is not perfect.
-Additionally we block images tagged with `{}` from our results due to discord ToS.", DISCORD_GLOBAL_EXCLUDE.to_string())
+This command may produce sexual explicit material in SFW channels, while we try to do our best to filter this out; gelbooru's tag system is not perfect.
+If ecchi/suggestive content (rating:`sensitive`) is desirable in a SFW channel either add `ecchi` in the channel name or `boorubot: ecchi` in the channel description, this will allow ecchi content while filtering NSFW.
+Additionally we block all images tagged with `{}` from our results due to discord ToS and community guidelines, this can not be disabled.", *DISCORD_GLOBAL_EXCLUDE)
 }

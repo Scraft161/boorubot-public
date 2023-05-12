@@ -32,10 +32,12 @@ struct Handler;
 impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
 
-        if let Interaction::ApplicationCommand(command) = interaction {
-            // Some commands may take longer to process so let's give discord a heads up.
-            //command.create_interaction_response(ctx, |b|
-            //    b.interaction_response_type(InteractionResponseType::DeferredChannelMessageWithSource)).await.unwrap();
+        if let Interaction::ApplicationCommand(command) = &interaction {
+            // Give discord a heads up that we're working so it doesn't time out the interaction.
+            match command.defer(&ctx.http).await {
+                Ok(_) => (),
+                Err(_) => println!("[WARN]: Could not defer interaction."),
+            }
 
             let interaction_channel = command.channel_id.to_channel(&ctx).await.unwrap();
             //dbg!(&interaction_channel);
@@ -55,22 +57,36 @@ impl EventHandler for Handler {
             } else {
                 match interaction_channel_info.topic {
                     Some(value) => {
-                        if value.contains("boorubot: ecchi") {
-                            true
-                        } else {
-                            false
-                        }
-                    },
+                        value.contains("boorubot: ecchi")                    },
                     None => false,
                 }
             };
 
             let content = match command.data.name.as_str() {
+                "help" => commands::help::run(&command.data.options),
                 "ping" => commands::ping::run(&command.data.options),
                 "booru" => commands::booru::run(&command.data.options, is_channel_nsfw, enable_ecchi).await,
                 _ => InteractionReturn::Message("not implemented :(".to_string()),
             };
 
+            if let Err(why) = command
+                .create_followup_message(&ctx.http, |response| {
+                    match content {
+                        InteractionReturn::Message(data) => response
+                            .content(data),
+                        InteractionReturn::SilentMessage(data) => response
+                            .ephemeral(true)
+                            .content(data),
+                        _ => todo!("Return types raw and embed are not supported for follow up yet"),
+                    }
+                })
+                .await
+            {
+                println!("Cannot respond to slash command: {}", why)
+            }
+
+            // Old return method
+            /*
             if let Err(why) = command
                 .create_interaction_response(&ctx.http, |response| {
                     //response
@@ -94,7 +110,21 @@ impl EventHandler for Handler {
             {
                 println!("Cannot respond to slash command: {}", why);
             }
+            */
         }
+
+        /*
+        if let Interaction::Autocomplete(completion) = interaction {
+            dbg!(&completion);
+
+            let content = match completion.data.name.as_str() {
+                "help" => commands::help::completion(&completion.data.options),
+                _ => panic!(),
+            };
+
+            dbg!(&content);
+        }
+        */
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
@@ -102,6 +132,7 @@ impl EventHandler for Handler {
 
         let commands = Command::set_global_application_commands(&ctx.http, |commands| {
             commands
+                .create_application_command(|command| commands::help::register(command))
                 .create_application_command(|command| commands::ping::register(command))
                 .create_application_command(|command| commands::booru::register(command))
         })
