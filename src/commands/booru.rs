@@ -1,4 +1,4 @@
-use crate::InteractionReturn;
+use crate::{InteractionReturn, CONFIG};
 use serenity::{
     builder::CreateApplicationCommand,
     model::prelude::{
@@ -9,20 +9,13 @@ use serenity::{
 use booru_rs::client::gelbooru::GelbooruClient;
 use booru_rs::client::generic::{BooruClient, BooruBuilder};
 
-lazy_static! {
-    /// A set of tags that will help aleviate Discord ToS violating content; we rely on gelbooru's
-    /// tagging for this so it may not be 100% accurate.
-    static ref DISCORD_GLOBAL_EXCLUDE: String = String::from("-loli -shota -gore");
-
-    /// A set of tags that will help exclude NSFW content whet it is not allowed.
-    static ref EXCLUDE_NSFW: String = String::from("-nude -completely_nude -rating:questionable -rating:explicit");
-
-    /// A list of tags that should never be used in searches.
-    /// This is primarily a mirror of DISCORD_GLOBAL_EXCLUDE; but may also include additional tags.
-    static ref BLACKLISTED_TAGS: Vec<&'static str> = vec!["loli", "shota", "gore", "guro"];
-}
-
 pub async fn run(options: &[CommandDataOption], allow_nsfw: bool, allow_ecchi: bool) -> InteractionReturn {
+
+    // Generate blacklist
+    let taglists = &CONFIG.read().await.booru_config;
+    let tag_blacklist = &taglists.blacklist;
+    let tag_blocklist = &taglists.force_block;
+    let tag_nsfwlist = &taglists.nsfw_tags;
 
     let mut user_tags = String::new();
     let mut user_exclude = String::new();
@@ -35,8 +28,9 @@ pub async fn run(options: &[CommandDataOption], allow_nsfw: bool, allow_ecchi: b
                 match &option.resolved {
                     Some(CommandDataOptionValue::String(input)) => {
                         let mut illegal_tags: Vec<&str> = Vec::new();
+                        let mut blocked_tags: Vec<&str> = Vec::new();
 
-                        for tag in BLACKLISTED_TAGS.iter() {
+                        for tag in tag_blacklist.iter() {
                             if input.contains(tag) {
                                 illegal_tags.push(tag)
                             }
@@ -44,6 +38,31 @@ pub async fn run(options: &[CommandDataOption], allow_nsfw: bool, allow_ecchi: b
 
                         if !illegal_tags.is_empty() {
                             return InteractionReturn::SilentMessage(format!("Your search includes tags that would violate discord's ToS: `{}`", illegal_tags.join("` `")));
+                        }
+
+                        for tag in tag_blocklist.iter() {
+                            if input.contains(tag) {
+                                blocked_tags.push(tag)
+                            }
+                        }
+
+                        if !blocked_tags.is_empty() {
+                            return InteractionReturn::SilentMessage(format!("Your search includes tags that have been blocked by the bot operator: {}\nContact them if you believe this is in error.", blocked_tags.join("` `")));
+                        }
+
+                        if !allow_nsfw {
+                            let mut blocked_nsfw_tags: Vec<String> = Vec::new();
+                            for tag in tag_nsfwlist.iter() {
+                                if input.contains(tag) {
+                                    // Was complaining, added `.to_owned` and now it shuts up; no
+                                    // fucking clue why and I'm not figuring it out.
+                                    blocked_nsfw_tags.push(tag.to_owned());
+                                }
+                            }
+
+                            if !blocked_nsfw_tags.is_empty() {
+                                return InteractionReturn::SilentMessage(format!("You're using NSFW tags in a SFW channel: {}\nEither move to a NSFW channel or remove those tags", blocked_nsfw_tags.join("` `")));
+                            }
                         }
 
                         user_tags = input.to_string()
@@ -82,7 +101,9 @@ pub async fn run(options: &[CommandDataOption], allow_nsfw: bool, allow_ecchi: b
     }
 
     let master_exclude = match allow_nsfw {
-        true => DISCORD_GLOBAL_EXCLUDE.to_string(),
+        true => {
+            invert_tags_and_stringify(tag_blacklist.clone())
+        }
         false => {
             if ! allow_ecchi {
                 match user_rating.as_str() {
@@ -91,7 +112,10 @@ pub async fn run(options: &[CommandDataOption], allow_nsfw: bool, allow_ecchi: b
                     _ => (),
                 }
             }
-            DISCORD_GLOBAL_EXCLUDE.to_string() + " " + &EXCLUDE_NSFW
+            let exclude_tags = invert_tags_and_stringify(tag_blacklist.clone());
+            let exclude_nsfw = invert_tags_and_stringify(tag_nsfwlist.clone());
+
+            exclude_tags + " " + &exclude_nsfw
         },
     };
 
@@ -104,6 +128,8 @@ pub async fn run(options: &[CommandDataOption], allow_nsfw: bool, allow_ecchi: b
     );
 
     let user_input = user_tags + &user_exclude + " " + &user_rating;
+
+    println!("{}", &master_exclude);
 
     let posts = match GelbooruClient::builder()
         .tag(user_input)        // User tags
@@ -188,7 +214,8 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
 }
 
 #[allow(dead_code)]
-pub fn help() -> String {
+pub async fn help() -> String {
+    let blocked_tags = &CONFIG.read().await.booru_config.force_block.join(" ");
     format!("`/booru` - Get an image from gelbooru
 
 Options:
@@ -208,5 +235,19 @@ Options:
 Note for moderators:
 This command may produce sexual explicit material in SFW channels, while we try to do our best to filter this out; gelbooru's tag system is not perfect.
 If ecchi/suggestive content (rating:`sensitive`) is desirable in a SFW channel either add `ecchi` in the channel name or `boorubot: ecchi` in the channel description, this will allow ecchi content while filtering NSFW.
-Additionally we block all images tagged with `{}` from our results due to discord ToS and community guidelines, this can not be disabled.", *DISCORD_GLOBAL_EXCLUDE)
+Additionally we block all images tagged with `{}` from our results due to discord ToS and community guidelines, this can not be disabled.", blocked_tags)
+}
+
+// Utility functions
+
+/// Used for creating a negative tag string from a vec with tags
+fn invert_tags_and_stringify(tags: Vec<String>) -> String {
+    let mut negative_tags = Vec::new();
+
+    for mut tag in tags {
+        tag.insert(0, '-');
+        negative_tags.push(tag);
+    }
+
+    negative_tags.join(" ")
 }

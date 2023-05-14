@@ -1,0 +1,15 @@
+[config]
+# You can put your bot token here or load it using the environment variable `DISCORD_TOKEN`
+#token = "YOUR_BOT_TOKEN_HERE"
+
+[booru_config]
+# A list of tags to always block and exclude from results.
+# This should just be a list of tags that may violate discord's content guidelines.
+# If you want to manually add tags use `force_block` instead
+blacklist = ["loli", "shota", "gore"]
+# A list of tags to block.
+# Users will not be able to include these tags in their searches; but images may still contain them.
+force_block = ["guro"]
+# A list of tags that should be limited to NSFW channels, images with these tags will also be blocked in SFW channels.
+# See this as a blacklist that only applies to sfw channels.
+nsfw_tags = ["rating:questionable", "rating:explicit", "nude", "completely_nude"]

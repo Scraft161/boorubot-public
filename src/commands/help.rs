@@ -8,7 +8,7 @@ use serenity::{
     }
 };
 
-pub fn run(options: &[CommandDataOption]) -> InteractionReturn {
+pub async fn run(options: &[CommandDataOption]) -> InteractionReturn {
     for option in options {
         match option.name.as_str() {
             "module" => {
@@ -17,7 +17,7 @@ pub fn run(options: &[CommandDataOption]) -> InteractionReturn {
                         match input.as_str() {
                             "help" => return InteractionReturn::SilentMessage(help()),
                             "ping" => return InteractionReturn::SilentMessage(String::from("No help for this module.")),
-                            "booru" => return InteractionReturn::SilentMessage(crate::commands::booru::help()),
+                            "booru" => return InteractionReturn::SilentMessage(crate::commands::booru::help().await),
                             _ => return InteractionReturn::SilentMessage(String::from("Invalid module name."))
                         };
                     }
@@ -51,13 +51,13 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
 }
 
 pub fn help() -> String {
-    format!("`/help` - Bot help and info
+    String::from("`/help` - Bot help and info
 
 Run `/help module` to get started")
 }
 
 #[allow(dead_code)]
-pub fn completion(options: &[CommandDataOption]) -> () {
+pub fn completion(options: &[CommandDataOption]) {
     for option in options {
         match option.name.as_str() {
             "module" => {},
