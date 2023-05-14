@@ -114,8 +114,12 @@ pub async fn run(options: &[CommandDataOption], allow_nsfw: bool, allow_ecchi: b
             }
             let exclude_tags = invert_tags_and_stringify(tag_blacklist.clone());
             let exclude_nsfw = invert_tags_and_stringify(tag_nsfwlist.clone());
+            let exclude_ecchi = invert_tags_and_stringify(tag_nsfwlist.clone());
 
-            exclude_tags + " " + &exclude_nsfw
+            match allow_ecchi {
+                true => exclude_tags + " " + &exclude_nsfw,
+                false => exclude_tags + " " + &exclude_nsfw + " " + &exclude_ecchi,
+            }
         },
     };
 

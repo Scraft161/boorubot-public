@@ -18,6 +18,7 @@ toml = "0.7.3"
 [profile.dev]
 opt-level = 0
 strip = "none"
+build.incremental = true
 
 [profile.release]
 opt-level = 3
