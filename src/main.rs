@@ -23,6 +23,7 @@ use serenity::{
 };
 
 lazy_static!{
+    /// Holds the current configuration, should only be written to during initialization.
     static ref CONFIG: RwLock<Config> = RwLock::new(Config {
         token: None,
         booru_config: BooruConfig {
@@ -33,6 +34,7 @@ lazy_static!{
     });
 }
 
+/// Return types for interactions.
 pub enum InteractionReturn {
     Message(String),
     SilentMessage(String),
